@@ -1,0 +1,30 @@
+server:
+  address: 0.0.0.0
+  shutdown: graceful
+
+spring:
+  application:
+    name: service-spring
+
+  threads:
+    virtual:
+      enabled: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://auth.develop.local/realms/realm-authorization-code-pkce
+          jwk-set-uri: http://keycloak:8080/realms/realm-authorization-code-pkce/protocol/openid-connect/certs
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+  endpoint:
+    health:
+      show-details: always
