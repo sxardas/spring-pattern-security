@@ -1,0 +1,5 @@
+service-spring/.gradle
+build/
+
+### IntelliJ IDEA ###
+*.iml

@@ -1,0 +1,97 @@
+{
+  "realm": "realm-authorization-code-pkce",
+  "enabled": true,
+  "registrationEmailAsUsername": true,
+
+  "roles": {
+    "realm": [
+      {
+        "name": "role_admin"
+      },
+      {
+        "name": "role_user"
+      }
+    ]
+  },
+
+  "groups": [
+    {
+      "name": "admin",
+      "path": "/admin",
+      "realmRoles": [
+        "role_admin",
+        "role_user"
+      ]
+    },
+    {
+      "name": "user",
+      "path": "/user",
+      "realmRoles": [
+        "role_user"
+      ]
+    }
+  ],
+
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@develop.local",
+      "emailVerified": true,
+
+      "firstName": "John",
+      "lastName" : "Doe",
+
+      "credentials": [
+        { "type": "password", "value": "admin", "temporary": false }
+      ],
+      "groups": [ "/admin" ]
+    },
+    {
+      "username": "user",
+      "enabled": true,
+      "email": "user@develop.local",
+      "emailVerified": true,
+
+      "firstName": "Jane",
+      "lastName" : "Smith",
+
+      "credentials": [
+        { "type": "password", "value": "user", "temporary": false }
+      ],
+      "groups": [ "/user" ]
+    }
+  ],
+
+  "clients": [
+    {
+      "clientId": "client-service-spring",
+      "name": "client-service-spring",
+      "enabled": true,
+      "protocol": "openid-connect",
+
+      "publicClient": true,
+      "standardFlowEnabled": true,
+
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+
+      "rootUrl": "https://develop.local",
+      "baseUrl": "/",
+
+      "redirectUris": [
+        "https://develop.local/*",
+        "https://oauth.pstmn.io/v1/callback"
+      ],
+
+      "webOrigins": [
+        "https://develop.local"
+      ],
+
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://develop.local/*"
+      }
+    }
+  ]
+}
