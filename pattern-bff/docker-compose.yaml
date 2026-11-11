@@ -1,0 +1,214 @@
+name: stand-bff
+
+services:
+
+  # === REVERSE PROXY ===
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    ports:
+      - "443:443"
+    networks:
+      net-bff:
+        aliases:
+          - auth.develop.local
+          - develop.local
+    volumes:
+      - ./infra/config/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/certs/ssl:/etc/nginx/certs:ro
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://127.0.0.1/healthz" ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # === IDENTITY PROVIDER ===
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8
+    container_name: keycloak
+    command: [ "start-dev", "--import-realm" ]
+    environment:
+      # bootstrap admin credentials
+      - KC_BOOTSTRAP_ADMIN_USERNAME=${KC_BOOTSTRAP_ADMIN_USERNAME}
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      # database configuration
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://keycloak-pg:5432/${KC_POSTGRES_DATABASE}
+      - KC_DB_USERNAME=${KC_POSTGRES_USERNAME}
+      - KC_DB_PASSWORD=${KC_POSTGRES_PASSWORD}
+      # hostname & proxy configuration
+      - KC_HOSTNAME=https://auth.develop.local
+      - KC_PROXY_HEADERS=xforwarded
+      - KC_HTTP_ENABLED=true
+      # health & metrics
+      - KC_HEALTH_ENABLED=true
+      - KC_METRICS_ENABLED=true
+      # idp
+      - KC_IDP_GITHUB_CLIENT_ID=${KC_IDP_GITHUB_CLIENT_ID}
+      - KC_IDP_GITHUB_CLIENT_SECRET=${KC_IDP_GITHUB_CLIENT_SECRET}
+      # client
+      - SERVICE_GATEWAY_KC_OAUTH2_CLIENT_SECRET=${SERVICE_GATEWAY_KC_OAUTH2_CLIENT_SECRET}
+    networks:
+      - net-bff
+    volumes:
+      - ./infra/config/keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep -q '200 OK'" ]
+      start_period: 60s
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      # reverse proxy
+      nginx:
+        condition: service_healthy
+      # storage
+      keycloak-pg:
+        condition: service_healthy
+
+  keycloak-pg:
+    image: postgres:18-alpine
+    container_name: keycloak-pg
+    environment:
+      - POSTGRES_DB=${KC_POSTGRES_DATABASE}
+      - POSTGRES_USER=${KC_POSTGRES_USERNAME}
+      - POSTGRES_PASSWORD=${KC_POSTGRES_PASSWORD}
+    networks:
+      - net-bff
+    volumes:
+      - keycloak-pg-data:/var/lib/postgresql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${KC_POSTGRES_USERNAME} -d ${KC_POSTGRES_DATABASE}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # === INFRASTRUCTURE SERVICES ===
+  infra-config:
+    image: infra-config
+    build:
+      context: ./infra-config
+    container_name: infra-config
+    networks:
+      - net-bff
+    healthcheck:
+      test: [ "CMD", "curl", "-fsS", "http://127.0.0.1:8888/actuator/health" ]
+      start_period: 10s
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  infra-discovery:
+    image: infra-discovery
+    build:
+      context: ./infra-discovery
+    container_name: infra-discovery
+    networks:
+      - net-bff
+    healthcheck:
+      test: [ "CMD", "curl", "-fsS", "http://127.0.0.1:8761/actuator/health" ]
+      start_period: 10s
+      interval: 5s
+      timeout: 5s
+      retries: 3
+  
+  # === BUSINESS SERVICES ===
+  service-gateway:
+    image: service-gateway
+    build:
+      context: ./service-gateway
+      additional_contexts:
+        certs: ./infra/certs/ca
+    container_name: service-gateway
+    environment:
+      - SERVICE_GATEWAY_RD_DATABASE=${SERVICE_GATEWAY_RD_DATABASE}
+      - SERVICE_GATEWAY_RD_USERNAME=${SERVICE_GATEWAY_RD_USERNAME}
+      - SERVICE_GATEWAY_RD_PASSWORD=${SERVICE_GATEWAY_RD_PASSWORD}
+      - SERVICE_GATEWAY_KC_OAUTH2_CLIENT_SECRET=${SERVICE_GATEWAY_KC_OAUTH2_CLIENT_SECRET}
+    networks:
+      - net-bff
+    healthcheck:
+      test: [ "CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health" ]
+      start_period: 10s
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      # identity provider
+      keycloak:
+        condition: service_healthy
+      keycloak-pg:
+        condition: service_healthy
+      # infrastructure services
+      infra-config:
+        condition: service_healthy
+      infra-discovery:
+        condition: service_healthy
+      # downstream services
+      service-resource:
+        condition: service_healthy
+      # storage
+      service-gateway-rd:
+        condition: service_healthy
+
+  service-gateway-rd:
+    image: redis:8.8.4-alpine
+    container_name: service-gateway-rd
+    command: [
+      "redis-server",
+      "--requirepass", "${SERVICE_GATEWAY_RD_PASSWORD}",
+
+      "--maxmemory",        "256mb",
+      "--maxmemory-policy", "volatile-lru",
+
+      "--appendonly", "yes",
+      "--appendfsync", "everysec",
+
+      "--save", "3600", "1", "300", "100", "60", "10000"
+    ]
+    networks:
+      - net-bff
+    volumes:
+      - service-gateway-rd:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--no-auth-warning", "-a", "${SERVICE_GATEWAY_RD_PASSWORD}", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  service-resource:
+    image: service-resource
+    build:
+      context: ./service-resource
+      additional_contexts:
+        certs: ./infra/certs/ca
+    container_name: service-resource
+    networks:
+      - net-bff
+    healthcheck:
+      test: [ "CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health" ]
+      start_period: 10s
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      # identity provider
+      keycloak:
+        condition: service_healthy
+      keycloak-pg:
+        condition: service_healthy
+
+# === NETWORKS & VOLUMES ===
+networks:
+  net-bff:
+    driver: bridge
+
+volumes:
+  keycloak-pg-data:
+  service-gateway-rd:
