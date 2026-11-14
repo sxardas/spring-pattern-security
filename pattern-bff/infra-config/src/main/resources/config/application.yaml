@@ -1,0 +1,22 @@
+# === SERVER ===
+server:
+  address: 0.0.0.0
+  shutdown: graceful
+
+# === SPRING ===
+spring:
+  threads:
+    virtual:
+      enabled: true
+
+# === MANAGEMENT & OBSERVABILITY ===
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+  endpoint:
+    health:
+      show-details: always
