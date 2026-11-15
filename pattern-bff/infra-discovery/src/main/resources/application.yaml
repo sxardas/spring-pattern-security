@@ -1,0 +1,40 @@
+# === SERVER ===
+server:
+  address: 0.0.0.0
+  port: 8761
+  shutdown: graceful
+
+# === SPRING ===
+spring:
+  application:
+    name: infra-discovery
+
+  threads:
+    virtual:
+      enabled: true
+
+# === EUREKA ===
+eureka:
+  instance:
+    hostname: infra-discovery
+
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://infra-discovery:8761/eureka/
+
+  server:
+    wait-time-in-ms-when-sync-empty: 0
+
+# === MANAGEMENT & OBSERVABILITY ===
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+  endpoint:
+    health:
+      show-details: always
