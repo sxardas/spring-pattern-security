@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: service-gateway
+  config:
+    import: configserver:http://infra-config:8888
