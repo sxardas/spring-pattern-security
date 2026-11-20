@@ -1,0 +1,82 @@
+# === SERVER ===
+server:
+  forward-headers-strategy: framework
+  reactive:
+    session:
+      cookie:
+        name: SESSION_COOKIE
+        same-site: strict
+        http-only: true
+        secure: true
+
+# === SPRING ===
+spring:
+  # --- data redis ---
+  data:
+    redis:
+      host: service-gateway-rd
+      port: 6379
+      database: ${SERVICE_GATEWAY_RD_DATABASE}
+      username: ${SERVICE_GATEWAY_RD_USERNAME}
+      password: ${SERVICE_GATEWAY_RD_PASSWORD}
+
+      connect-timeout: 5s
+      timeout: 2s
+
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 10
+          max-idle: 5
+          min-idle: 2
+  # --- session ---
+  session:
+    data:
+      redis:
+        namespace: spring:session:gateway
+    timeout: 30m
+  # --- security ---
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            client-id: client-service-gateway
+            client-name: client-service-gateway
+            client-secret: ${SERVICE_GATEWAY_KC_OAUTH2_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            scope:
+              - openid
+              - profile
+              - email
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+        provider:
+          keycloak:
+            issuer-uri: https://auth.develop.local/realms/realm-bff
+            user-name-attribute: preferred_username
+  # --- cloud ---
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: service-resource
+              uri: lb://service-resource
+              predicates:
+                - Path=/resource/api/**
+              filters:
+                - StripPrefix=1
+                - TokenRelay=
+                - RemoveRequestHeader=Cookie
+
+# === EUREKA ===
+eureka:
+  instance:
+    hostname: service-gateway
+    prefer-ip-address: true
+
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://infra-discovery:8761/eureka/
