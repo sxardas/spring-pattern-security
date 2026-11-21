@@ -1,0 +1,32 @@
+# === SERVER ===
+server:
+  address: 0.0.0.0
+  shutdown: graceful
+
+# === SPRING ===
+spring:
+  application:
+    name: service-web
+
+  threads:
+    virtual:
+      enabled: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://auth.develop.local/realms/realm-auth-code-pkce
+          jwk-set-uri: https://auth.develop.local/realms/realm-auth-code-pkce/protocol/openid-connect/certs
+
+# === MANAGEMENT & OBSERVABILITY ===
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+  endpoint:
+    health:
+      show-details: always
