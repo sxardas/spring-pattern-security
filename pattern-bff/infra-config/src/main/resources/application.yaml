@@ -1,0 +1,36 @@
+# === SERVER ===
+server:
+  address: 0.0.0.0
+  port: 8888
+  shutdown: graceful
+
+# === SPRING ===
+spring:
+  application:
+    name: infra-config
+
+  threads:
+    virtual:
+      enabled: true
+
+  profiles:
+    active: native
+
+  # --- cloud ---
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath:/config
+
+# === MANAGEMENT & OBSERVABILITY ===
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+  endpoint:
+    health:
+      show-details: always

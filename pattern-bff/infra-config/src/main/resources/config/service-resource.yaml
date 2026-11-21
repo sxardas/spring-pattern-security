@@ -1,0 +1,25 @@
+# === SERVER ===
+server:
+  port: 8080
+
+# === SPRING ===
+spring:
+  # --- security ---
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://auth.develop.local/realms/realm-bff
+          jwt-set-uri: https://auth.develop.local/realms/realm-bff/protocol/openid-connect/certs
+
+# === EUREKA ===
+eureka:
+  instance:
+    hostname: service-resource
+    prefer-ip-address: true
+
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://infra-discovery:8761/eureka/

@@ -8,6 +8,7 @@ root directory. Every module is self-contained and runs locally with Docker Comp
 ### 🧩 Patterns & Implementations
 
 - [**Authorization Code Flow with PKCE**](pattern-auth-code-pkce/README.md)
+- [**Backend For Frontend**](pattern-bff/README.md)
 
 > Work in progress. New patterns are added over time.
 
