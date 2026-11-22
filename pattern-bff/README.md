@@ -89,7 +89,7 @@ The gateway route does the last part:
 
 ```yaml
 - id: service-resource
-  uri: lb://service-resource Eureka
+  uri: lb://service-resource
   predicates:
     - Path=/resource/api/**
   filters:
